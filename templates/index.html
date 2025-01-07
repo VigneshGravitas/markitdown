@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarkItDown Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .drop-zone {
+            width: 100%;
+            max-width: 400px;
+            height: 200px;
+            padding: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 20px;
+            font-weight: 500;
+            cursor: pointer;
+            color: #777;
+            border: 2px dashed #3498db;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        .drop-zone--over {
+            border-style: solid;
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+        .drop-zone__input {
+            display: none;
+        }
+        .drop-zone__thumb {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            overflow: hidden;
+            background-color: #f8f9fa;
+            background-size: cover;
+            position: relative;
+        }
+        .file-list {
+            width: 100%;
+            max-width: 400px;
+            margin-top: 20px;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+        .file-item .remove-file {
+            color: #e74c3c;
+            cursor: pointer;
+            padding: 5px;
+        }
+        .submit-button {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .submit-button:hover {
+            background-color: #2980b9;
+        }
+        .submit-button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .supported-formats {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .supported-formats h2 {
+            color: #2c3e50;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        .formats-list {
+            columns: 2;
+            list-style-type: none;
+            padding: 0;
+        }
+        .formats-list li {
+            margin-bottom: 8px;
+            color: #34495e;
+        }
+        #progress-container {
+            width: 100%;
+            max-width: 400px;
+            display: none;
+        }
+        .progress-item {
+            margin-bottom: 10px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background-color: #3498db;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MarkItDown Converter</h1>
+        <form class="upload-form" action="/convert" method="post" enctype="multipart/form-data">
+            <div class="drop-zone">
+                <span class="drop-zone__prompt">Drop files here or click to upload</span>
+                <input type="file" name="files" class="drop-zone__input" multiple>
+            </div>
+            <div class="file-list" id="fileList"></div>
+            <div id="progress-container"></div>
+            <button type="submit" class="submit-button" disabled>Convert Files</button>
+        </form>
+
+        <div class="supported-formats">
+            <h2>Supported Formats:</h2>
+            <ul class="formats-list">
+                <li>📄 PDF Files</li>
+                <li>📝 Word Documents (.docx)</li>
+                <li>📊 PowerPoint (.pptx)</li>
+                <li>📈 Excel (.xlsx)</li>
+                <li>🖼️ Images (with OCR)</li>
+                <li>🎵 Audio (with transcription)</li>
+                <li>🌐 HTML Files</li>
+                <li>📊 CSV Files</li>
+                <li>📦 ZIP Files</li>
+                <li>🔤 Text Files</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        document.querySelectorAll(".drop-zone__input").forEach(inputElement => {
+            const dropZoneElement = inputElement.closest(".drop-zone");
+
+            dropZoneElement.addEventListener("click", e => {
+                inputElement.click();
+            });
+
+            inputElement.addEventListener("change", e => {
+                updateFileList();
+            });
+
+            dropZoneElement.addEventListener("dragover", e => {
+                e.preventDefault();
+                dropZoneElement.classList.add("drop-zone--over");
+            });
+
+            ["dragleave", "dragend"].forEach(type => {
+                dropZoneElement.addEventListener(type, e => {
+                    dropZoneElement.classList.remove("drop-zone--over");
+                });
+            });
+
+            dropZoneElement.addEventListener("drop", e => {
+                e.preventDefault();
+                
+                if (e.dataTransfer.files.length) {
+                    inputElement.files = e.dataTransfer.files;
+                    updateFileList();
+                }
+
+                dropZoneElement.classList.remove("drop-zone--over");
+            });
+        });
+
+        function updateFileList() {
+            const input = document.querySelector('.drop-zone__input');
+            const fileList = document.getElementById('fileList');
+            const submitButton = document.querySelector('.submit-button');
+            
+            fileList.innerHTML = '';
+            
+            if (input.files.length > 0) {
+                Array.from(input.files).forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.innerHTML = `
+                        <span>${file.name}</span>
+                        <span class="remove-file">✕</span>
+                    `;
+                    fileList.appendChild(fileItem);
+                });
+                submitButton.disabled = false;
+            } else {
+                submitButton.disabled = true;
+            }
+        }
+
+        document.querySelector('.upload-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const progressContainer = document.getElementById('progress-container');
+            progressContainer.style.display = 'block';
+            
+            try {
+                const response = await fetch('/convert', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'converted_files.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                } else {
+                    const error = await response.text();
+                    alert('Error: ' + error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                progressContainer.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
